@@ -11,8 +11,8 @@ import ssl
 # Default items
 url_base = 'https://ag.us.clearapis.com'
 # ClearAg API Credentials:
-app_id = '98fdd508'
-app_key = 'e986e3d6e5cc2995d3cb10c5ff0ead64'
+app_id = ''
+app_key = ''
 
 os.environ['TZ'] = 'UTC'
 tzset()
