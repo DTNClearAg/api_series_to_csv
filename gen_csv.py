@@ -25,7 +25,7 @@ def create_argparser():
 		help='Specify input CSV file'),
 	parser.add_argument('-e', '--endpoint',
 		help='Specify which endpoints to compile data from.',
-		choices=['daily', 'hourly', 'daily_climo', 'gdd', 'canopy_wetness', 'spray_conditions', 'weatherplot'])
+		choices=['daily', 'hourly', 'daily_climo', 'gdd', 'canopy_wetness', 'spray_conditions'])
 	parser.add_argument('-u', '--units',
 		help='Specify units for data.  Option: us-std or si-std',
 		choices=['us-std', 'si-std', 'us-std-precise', 'si-std-precise'],
@@ -83,7 +83,7 @@ def create_csv(args, labels, fields):
 	'''
 	for index in sorted(fields.keys()):
 		record = fields[index]
-		user_name = 'yen_test_locations_v2' #args.file.replace('.csv', '')
+		user_name = args.file.replace('.csv', '')
 		user_dir = "./{}".format(user_name)
 
 		if not os.path.exists(user_dir):
@@ -93,19 +93,7 @@ def create_csv(args, labels, fields):
 		print "\tOutputting to: {}".format(output_name)
 		with open(output_name, 'w') as output:
 			csv_writer = csv.writer(output)
-			header = ['Location', 'Date [YYYY-MM-DD]', 'Latitude', 'Longitude', 'Units', 'Historical/Forecast [H/F]', 
-				'Temperature Min [C]', 
-				'Temperature Avg [C]', 
-				'Temperature Max [C]', 
-				'Temperature Climatological Min [C]', 
-				'Temperature Climatological  Avg [C]', 
-				'Temperature Climatological Max [C]', 
-				'Relative Humidity Min [%]', 
-				'Relative Humidity [%]', 
-				'Relative Humidity Max [%]', 
-				'Wind Min [kph]', 
-				'Wind Avg [kph]', 
-				'Wind Max [kph]', 'Climatological Avg Wind [kph]', 'Cloud Cover [%]', 'Solar Radiation [MJm^-2]', 'Solar Radiation Accumulated [MJm^-2]', 'Solar Radiation Climatology [MJm^-2]', 'Solar Radiation Climatology Accumulated [MJm^-2]', 'Precipitation [mm]', 'Precipitation Total [mm]', 'Precipitation Climatological [mm]', 'Precipitation Climatological Total [mm]', 'Soil Temperature Min 0 to 10cm [C]', 'Soil Temperature Avg 0 to 10cm [C]', 'Soil Temperature Max 0 to 10cm [C]', 'Soil Moisture 0 to 10cm [mm]', 'Soil Moisture 0 to 200cm [mm]', 'Scaled Soil Moisture 0 to 10cm [Historic Percentile]', 'Scaled Soil Moisture 0 to 200cm [Historic Percentile]', 'Evapotranspiration [mm]', 'AGDD', 'GDD']
+			header = ['location', 'latitude', 'longitude', 'date']
 
 			if args.endpoint == 'daily':
 				r = clearag_apis.get_daily_history(record['latitude'], record['longitude'], record['start'], record['end'], units=args.units, datatype=args.datatype)
@@ -119,95 +107,23 @@ def create_csv(args, labels, fields):
 				r = clearag_apis.get_leaf_canopy_wetness(record['latitude'], record['longitude'], record['start'], record['end'])
 			elif args.endpoint == 'spray_conditions':
 				r = clearag_aaapies.get_hourly_spray_conditions(record['latitude'], record['longitude'], record['start'], record['end'])
-			elif args.endpoint == 'weatherplot':
-				r_wx = clearag_apis.get_daily_history(record['latitude'], record['longitude'], record['start'], record['end'], units=args.units, datatype='wx')
-				r_soil = clearag_apis.get_daily_history(record['latitude'], record['longitude'], record['start'], record['end'], units=args.units, datatype='soil')
-				r_c = clearag_apis.get_daily_climo(record['latitude'], record['longitude'], record['start'], record['end'], units=args.units)
-				r_gdd = clearag_apis.get_gdd(record['latitude'], record['longitude'], record['start'], record['end'], units=args.units)
 
 			# make header labels
-			# for date in sorted(r_wx.keys()):
-			# 	for param in r[date].keys():
-			# 		if 'value' in r_wx[date][param] and ('short_wave_radiation_avg' in param or param == 'precip_acc_period' or 'air_temp_' in param):
-			# 			if param == 'short_wave_radiation_avg':
-			# 				header.append(str(param)+'[MJ/m^2]')
-			# 			else: 
-			# 				if r_wx[date][param]['unit'] != 'n/a':
-			# 					header.append(str(param)+'['+str(r_wx[date][param]['unit'])+']')
-			# 				else:
-			# 					header.append(str(param))
-			# 		break
+			for date in sorted(r.keys()):
+				for param in r[date].keys():
+					if 'value' in r[date][param]:
+						if r[date][param]['unit'] != 'n/a':
+							header.append(str(param)+'('+str(r[date][param]['unit'])+')')
+						else:
+							header.append(str(param))
+		 		break
 			csv_writer.writerow(header)
 
-			precip_total = 0
-			precip_climo_total = 0
-			rad_total = 0
-			rad_climo_total = 0
-		 	for date in sorted(r_wx.keys()):
-		 		rad = float(r_wx[str(date)]['short_wave_radiation_avg']['value']) * 0.0864
-		 		rad_total += rad
-
-		 		rad_climo = float(r_c[get_time(str(date)).format('MM-DD')]['short_wave_radiation_avg']['value']) * 0.0864
-		 		rad_climo_total += rad_climo
-
-		 		precip = r_wx[str(date)]['precip_acc_period']['value']
-		 		precip_total += precip
-
-		 		precip_climo = r_c[get_time(str(date)).format('MM-DD')]['precip_acc_avg']['value']
-		 		precip_climo_total += precip_climo
-
-		 		row = [index, date, record['latitude'], record['longitude'], args.units, 'H', 
-		 			r_wx[date]['air_temp_min']['value'], 
-		 			r_wx[date]['air_temp_avg']['value'], 
-		 			r_wx[date]['air_temp_max']['value'], 
-		 			r_c[get_time(str(date)).format('MM-DD')]['air_temp_min_avg']['value'], 
-		 			r_c[get_time(str(date)).format('MM-DD')]['air_temp_avg']['value'], 
-		 			r_c[get_time(str(date)).format('MM-DD')]['air_temp_max_avg']['value'], 
-		 			r_wx[date]['relative_humidity_min']['value'], 
-		 			r_wx[date]['relative_humidity_avg']['value'], 
-		 			r_wx[date]['relative_humidity_max']['value'], 
-		 			r_wx[date]['wind_speed_min']['value'], 
-		 			r_wx[date]['wind_speed_avg']['value'], 
-		 			r_wx[date]['wind_speed_max']['value'], 
-		 			r_c[get_time(str(date)).format('MM-DD')]['wind_speed_avg']['value'], 
-		 			r_wx[date]['cloud_cover_avg']['value'], 
-		 			
-		 			rad, #r[date]['Solar Radiation [MJm^-2]']['value'], 
-		 			rad_total, #r[date]['Solar Radiation Accumulated [MJm^-2]']['value'], 
-		 			
-		 			rad_climo, #r[date]['Solar Radiation Climatology [MJm^-2]']['value'], 
-		 			rad_climo_total, #r[date]['Solar Radiation Climatology Accumulated [MJm^-2]']['value'], 
-		 			
-		 			precip, #r_wx[date]['precip_acc_period']['value'], 
-		 			precip_total, #r[date]['Precipitation Total [mm]']['value'], 
-
-		 			precip_climo, #r_c[date]['precip_acc_avg']['value'], 
-		 			precip_climo_total, #r[date]['Precipitation Climatological Total [mm]']['value'], 
-
-		 			r_soil[date]['soil_temp_min_0to10cm']['value'], 
-		 			r_soil[date]['soil_temp_0to10cm']['value'], 
-		 			r_soil[date]['soil_temp_max_0to10cm']['value'], 
-		 			r_soil[date]['soil_moisture_0to10cm']['value'], 
-		 			r_soil[date]['soil_moisture_0to200cm']['value'], 
-		 			r_soil[date]['scaled_soil_moisture_0to10cm']['value'], 
-		 			r_soil[date]['normalized_soil_moisture_0to200cm']['value'], 
-		 			r_wx[date]['pet_period']['value'],
-		 			r_gdd[date]['agdd'], 
-		 			r_gdd[date]['gdd']
-		 		]
-				# r_gdd = clearag_apis.get_gdd(record['latitude'], record['longitude'], date, date, units=args.units)
-				# row.append([
-			 	# 		r_gdd[date]['agdd'], 
-			 	# 		r_gdd[date]['gdd']
-			 	# 	])
-
-
-		 		# for param in r_wx[date].keys():
-		 		# 	if 'value' in r_wx[date][param] and ('short_wave_radiation_avg' in param or param == 'precip_acc_period' or 'air_temp_' in param):
-		 		# 		if param == 'short_wave_radiation_avg' and r_wx[date][param]['value'] != 'n/a':
-		 		# 			row.append(str(float(r_wx[date][param]['value']) * 0.0864))
-		 		# 		else:
-		 		# 			row.append(str(r_wx[date][param]['value']))
+		 	for date in sorted(r.keys()):
+		 		row = [index, record['latitude'], record['longitude'], date]
+		 		for param in r[date].keys():
+		 			if 'value' in r[date][param]:
+		 				row.append(str(r[date][param]['value']))
 		 		csv_writer.writerow(row)
 
 

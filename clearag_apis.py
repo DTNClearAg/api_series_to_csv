@@ -260,42 +260,22 @@ def get_gdd(lat,lon,start_date,end_date,units=units_def,base_temp=50,upper_limit
     # compute epochs
     time_beg = int(d_beg.strftime("%s"))
     time_end = int(d_end.strftime("%s"))
+    days = int((time_end - time_beg) / 86400)+1
+    url = Template(url_t)
+    url2get = url.substitute(lat=lat,lon=lon,time_beg=time_beg,days=days,upper_limit_temp=upper_limit_temp,base_temp=base_temp)
+    print url2get
+    response = urllib.urlopen(url2get)
 
-    time1 = time_beg
-    # days = int((time_end - time_beg) / 86400)+1
-    # The 'end' value when selecting range for this endpoint isn't inclusive.
-    time2 = min([time_end,time1+max_range_sec]) + 1
+    if response is not None:
+        if data == None:
 
-    while time1 < time_end:
-        days = int((time2 - time1) / 86400+1)
-        if days > 366:
-            days = 366
-        url = Template(url_t)
-        url2get = url.substitute(lat=lat,lon=lon,time_beg=time1, days=days,upper_limit_temp=upper_limit_temp,base_temp=base_temp)
-        print url2get
-        response = urllib.urlopen(url2get)
+            # We are restricting to one location per call of this routine,
+            # so let's strip off the outer element of the JSON ("lat,lon" key)
+            # and let the calling application be responsible for knowing that.
 
-        if response is not None:
-            if data == None:
-
-                # We are restricting to one location per call of this routine,
-                # so let's strip off the outer element of the JSON ("lat,lon" key)
-                # and let the calling application be responsible for knowing that.
-
-                data = (json.loads(response.read())).values()[0].values()[0]
-            else:
-                data.update( (json.loads(response.read())).values()[0].values()[0])
-
-
-        # Time2 had that extra second, so clip it off and re-add for next time
-        time1 = time2 + 86400 - 1 
-        time2 = min([time1+max_range_sec,time_end]) + 1
-
-    # need to aggregate gdd for entire data set
-    agdd_correct = 0
-    for date in sorted(data.keys()):
-        agdd_correct += data[date]['gdd']
-        data[date]['agdd'] = agdd_correct
+            data = (json.loads(response.read())).values()[0].values()[0]
+        else:
+            data.update( (json.loads(response.read())).values()[0].values()[0])
 
     return data
 
